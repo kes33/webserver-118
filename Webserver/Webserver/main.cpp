@@ -340,5 +340,5 @@ const char* getRequestedFilename(const char* response) {
 
 // stub for getContentType function
 const char* getContentType (const char* fileName) {
-    return "jpg";
+    return "image/jpg";
 }
