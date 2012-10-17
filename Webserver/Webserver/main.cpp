@@ -7,7 +7,6 @@
 //
 
 /*QUESTIONS:
-    nothing new here; just checking that the commit works
  */
 
 #include <stdio.h>
@@ -22,6 +21,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <time.h>
+#include <ctype.h>
 
 #define true 1
 #define false 0
@@ -338,7 +338,26 @@ const char* getRequestedFilename(const char* response) {
     return strtok(NULL, " ");
 }
 
-// stub for getContentType function
-const char* getContentType (const char* fileName) {
-    return "image/jpg";
+// Input: filename, as a C string
+// Output: MIME content type, defaulting to HTML if type not recognized
+// Assumptions: assumes correctly formatted filename with no whitespace
+const char* getContentType(const char* filename) {
+    // make lowercase
+    char buffer[strlen(filename)];
+    strcpy(buffer, filename);
+    
+    int i;
+    for (i = 0; buffer[i]; i++)
+        buffer[i] = tolower(buffer[i]);
+    
+    // get extension
+    char* extn = strrchr(buffer, '.') + 1;
+    
+    // return appropriate content type
+    if (strcmp(extn, "jpeg") == 0 || strcmp(extn, "jpg") == 0)
+        return "image/jpeg";
+    else if (strcmp(extn, "gif") == 0)
+        return "image/gif";
+    else
+        return "text/html";
 }
