@@ -142,6 +142,7 @@ int main (int argc, const char * argv[]) {
 }
 
 void respondWithHTML(int socketfd) {
+//    printf("child socket number %zd going through respondWithHTML\n", getpid());
     
     /*-------------variable declarations-----------------*/
     size_t buffsize = BUFSIZE;
@@ -176,6 +177,7 @@ void respondWithHTML(int socketfd) {
     long int test;
     
     replyHeader->contentLength = 0;
+    replyHeader->contentType = NULL;
     
     
     /*--------------read in a loop to make sure buffer is large enough for request message-------------------*/
@@ -189,6 +191,7 @@ void respondWithHTML(int socketfd) {
             exit(1);
         }
         else if (amountRead == 0) {  //socket closed
+            loopback=false;
             fprintf(stderr, "client socket closed - no complete request messages received\n");
             exit(1);
         }
@@ -219,15 +222,15 @@ void respondWithHTML(int socketfd) {
 
     if (isValidHttpRequest(buf) == false){
         replyHeader->statusCode = "400 Bad Request";
+//        printf("got bad request");
     }
     
     else {                  //was a valid http request
         fileName = getRequestedFilename(buf);
+        printf("filename is %s", fileName);
         fileName = fileName + 1;    //to get rid of leading '/'
-        printf("Size of filenName is %zd\n", strlen(fileName));
-        printf("requested filename is: %s\n", fileName);
         
-        requestedFileDescriptor = open(fileName, O_RDONLY);
+        requestedFileDescriptor = open("index.html", O_RDONLY);
         if (requestedFileDescriptor < 0) {
             perror("error opening requested file");
             replyHeader->statusCode = "404 Not Found";
@@ -240,6 +243,11 @@ void respondWithHTML(int socketfd) {
             else {
                 replyHeader->contentLength = fileStats->st_size;
                 replyHeader->statusCode = "200 OK";
+                replyHeader->contentType = (const char*)malloc(BUFSIZE);
+                if (replyHeader->contentType == NULL) {
+                    perror("error allocating memory for the content type");
+                    exit(1);
+                }
                 replyHeader->contentType = getContentType(fileName);
             }
         }
@@ -280,6 +288,7 @@ void respondWithHTML(int socketfd) {
     free(replyHeader);
     free(buf);
     free(fileStats);
+    free((void*)replyHeader->contentType);
 }
 
 
@@ -287,6 +296,7 @@ void respondWithHTML(int socketfd) {
 //pointer to the header, with memory allocated (and later freed) by the calling function
 //Output: the header c-string, properly formatted with all necessary content and with terminating crlf
 int createHeader(struct headerInfo* replyHeader, char* header){
+    printf("entering createMessageHeader\n");
     
     char terminatingString [] = "\n\0";
     snprintf(header, BUFSIZE, "HTTP/1.1 %s\n"
@@ -349,6 +359,11 @@ const char* getRequestedFilename(const char* response) {
     strtok(buffer, " ");
     return strtok(NULL, " ");
 }
+
+// stub for getContentType function
+//const char* getContentType (const char* fileName) {
+ //   return "text/html";
+//}
 
 // Input: filename, as a C string
 // Output: MIME content type, defaulting to HTML if type not recognized
