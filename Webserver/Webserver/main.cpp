@@ -244,11 +244,7 @@ void respondWithHTML(int socketfd) {
                 replyHeader->contentLength = fileStats->st_size;
                 replyHeader->statusCode = "200 OK";
                 replyHeader->contentType = (const char*)malloc(BUFSIZE);
-                if (replyHeader->contentType == NULL) {
-                    perror("error allocating memory for the content type");
-                    exit(1);
-                }
-                replyHeader->contentType = getContentType(fileName);
+                replyHeader->contentType= getContentType(fileName);
             }
         }
     }
