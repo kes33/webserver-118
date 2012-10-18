@@ -21,6 +21,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <time.h>
+#include <cctype>
 
 #define true 1
 #define false 0
