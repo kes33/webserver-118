@@ -164,7 +164,7 @@ void respondWithHTML(int socketfd) {
         perror("failed to allocate buffer for replyHeader");
         exit(1);
     }
-    const char* fileName;
+    const char* fileName = NULL;
     int requestedFileDescriptor;
     struct stat* fileStats = (struct stat*) malloc(sizeof(struct stat));
     if (fileStats == NULL) {
@@ -222,15 +222,17 @@ void respondWithHTML(int socketfd) {
 
     if (isValidHttpRequest(buf) == false){
         replyHeader->statusCode = "400 Bad Request";
-//        printf("got bad request");
     }
     
     else {                  //was a valid http request
-        fileName = getRequestedFilename(buf);
-        printf("filename is %s", fileName);
-        fileName = fileName + 1;    //to get rid of leading '/'
+        char buffer[strlen(buf)+1];
+        strcpy(buffer, buf);
         
-        requestedFileDescriptor = open("index.html", O_RDONLY);
+        strtok(buffer, " ");
+        fileName = strtok(NULL, " ");
+        fileName = fileName+1;
+        
+        requestedFileDescriptor = open(fileName, O_RDONLY);
         if (requestedFileDescriptor < 0) {
             perror("error opening requested file");
             replyHeader->statusCode = "404 Not Found";
@@ -243,7 +245,6 @@ void respondWithHTML(int socketfd) {
             else {
                 replyHeader->contentLength = fileStats->st_size;
                 replyHeader->statusCode = "200 OK";
-                replyHeader->contentType = (const char*)malloc(BUFSIZE);
                 replyHeader->contentType= getContentType(fileName);
             }
         }
@@ -258,25 +259,35 @@ void respondWithHTML(int socketfd) {
     curHeaderSize = strlen(messageHeader);
     totalHeaderBufSize = curHeaderSize + replyHeader->contentLength;
     messageHeader = (char*)realloc(messageHeader, totalHeaderBufSize);  //reallocate the messageHeader so there is room for the data portion
+    if (messageHeader == NULL) {
+        perror("error reallocating memory for messageHeader");
+        exit(1);
+    }
     
     //write the data to the end of the header
-    writePoint = messageHeader + curHeaderSize;
+    writePoint = messageHeader + curHeaderSize;   //will write over the terminating '\0'
     if (requestedFileDescriptor >= 0) {
-        if (read(requestedFileDescriptor, (void*)writePoint, replyHeader->contentLength) < replyHeader->contentLength) {
+        long int test;
+        test = read(requestedFileDescriptor, (void*)writePoint, replyHeader->contentLength);
+        if (test == -1) {
+            perror("error reading from requested file");
+            exit(1);
+        }
+        if (test < replyHeader->contentLength) {
             perror("did not read all of content into reply message");
         }
     }
     
-    //write the reply message to the socket
-    printf("reply message is %s\n", messageHeader);
-    test = write(socketfd, messageHeader, sizeof(messageHeader));
+   //write the reply message to the socket
+    printf("%s", messageHeader);
+    test = write(socketfd, messageHeader, totalHeaderBufSize);
                  
     if (test< 0) {
         perror("error writing file to socket");
         exit(1);
     }
     
-    if (test < sizeof(messageHeader))
+    if (test < totalHeaderBufSize)
         perror("did not write all of the content to the socket");
     
     close(requestedFileDescriptor);
@@ -284,7 +295,6 @@ void respondWithHTML(int socketfd) {
     free(replyHeader);
     free(buf);
     free(fileStats);
-    free((void*)replyHeader->contentType);
 }
 
 
@@ -292,9 +302,7 @@ void respondWithHTML(int socketfd) {
 //pointer to the header, with memory allocated (and later freed) by the calling function
 //Output: the header c-string, properly formatted with all necessary content and with terminating crlf
 int createHeader(struct headerInfo* replyHeader, char* header){
-    printf("entering createMessageHeader\n");
-    
-    char terminatingString [] = "\n\0";
+    char terminatingString [] = "\n";
     snprintf(header, BUFSIZE, "HTTP/1.1 %s\n"
              "Connection: close\n"
              "Date: %s"
@@ -312,7 +320,6 @@ int createHeader(struct headerInfo* replyHeader, char* header){
         return 0;
     }
 }
-
 
 // Input: response, containing the HTTP GET request
 // Output: true if valid HTTP GET request, false otherwise
@@ -340,26 +347,10 @@ const int isValidHttpRequest(const char* response) {
                 return true;
         }
     }
-    
     // if any problem with GET format, send
     return false;
 }
 
-// Input: response, containing the HTTP GET request
-// Output: requested filename
-// Assumptions: HTTP GET request has been validated by isValidHttpRequest
-const char* getRequestedFilename(const char* response) {
-    char buffer[strlen(response)];
-    strcpy(buffer, response);
-    
-    strtok(buffer, " ");
-    return strtok(NULL, " ");
-}
-
-// stub for getContentType function
-//const char* getContentType (const char* fileName) {
- //   return "text/html";
-//}
 
 // Input: filename, as a C string
 // Output: MIME content type, defaulting to HTML if type not recognized
