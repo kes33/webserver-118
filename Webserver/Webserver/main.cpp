@@ -41,9 +41,8 @@ struct headerInfo {
 //function declarations
 void respondWithHTML(int socketfd);
 const int isValidHttpRequest(const char* response);
-const char* getRequestedFilename(const char* buffer);
 const char* getContentType (const char* fileName);
-int createHeader(struct headerInfo* replyHeader, char * header);
+void createHeader(struct headerInfo* replyHeader, char * header);
 
 
 void sigChildHandler (int s) {
@@ -225,6 +224,7 @@ void respondWithHTML(int socketfd) {
     }
     
     else {                  //was a valid http request
+        // getting filename
         char buffer[strlen(buf)+1];
         strcpy(buffer, buf);
         
@@ -232,12 +232,14 @@ void respondWithHTML(int socketfd) {
         fileName = strtok(NULL, " ");
         fileName = fileName+1;
         
+        //attempt to open requested file
         requestedFileDescriptor = open(fileName, O_RDONLY);
         if (requestedFileDescriptor < 0) {
             perror("error opening requested file");
             replyHeader->statusCode = "404 Not Found";
         }
         else {
+            //get file length and content type
             if (fstat(requestedFileDescriptor, fileStats) < 0) {
                 perror("error reading file stats");
                 exit(1);
@@ -249,9 +251,11 @@ void respondWithHTML(int socketfd) {
             }
         }
     }
-    
+    //get time for reply message header
     time_t timer = time(NULL);
     replyHeader->date = ctime(&timer);
+    
+    //create header portion of reply message - messageHeader is string
     messageHeader = (char*)malloc(BUFSIZE+strlen(fileName));
     createHeader(replyHeader, messageHeader);
     
@@ -266,6 +270,7 @@ void respondWithHTML(int socketfd) {
     
     //write the data to the end of the header
     writePoint = messageHeader + curHeaderSize;   //will write over the terminating '\0'
+    //only read from file if we were able to open it previously - otherwise, header will stay "404 Not Found" or "400 Bad Request"
     if (requestedFileDescriptor >= 0) {
         long int test;
         test = read(requestedFileDescriptor, (void*)writePoint, replyHeader->contentLength);
@@ -301,23 +306,20 @@ void respondWithHTML(int socketfd) {
 //Input: a pointer to the replyHeader structure, filled out with the necessary info, and a
 //pointer to the header, with memory allocated (and later freed) by the calling function
 //Output: the header c-string, properly formatted with all necessary content and with terminating crlf
-int createHeader(struct headerInfo* replyHeader, char* header){
-    char terminatingString [] = "\n";
+void createHeader(struct headerInfo* replyHeader, char* header){
     snprintf(header, BUFSIZE, "HTTP/1.1 %s\n"
              "Connection: close\n"
              "Date: %s"
              "Server: Apache\n", replyHeader->statusCode, replyHeader->date);
     
     if ((strcmp(replyHeader->statusCode, "404 Not Found") == 0) || (strcmp(replyHeader->statusCode, "400 Bad Request")) == 0){
-        strcat(header, terminatingString);
-        return 0;
+        strcat(header, "\n");
     }
     
     else {     //need to add the content-length and type to the header
         size_t currentHeaderLen = strlen(header);
         snprintf(header+currentHeaderLen, (BUFSIZE-currentHeaderLen), "Content-Length: %lld\n"
                  "Content-Type: %s\n\n", replyHeader->contentLength, replyHeader->contentType);
-        return 0;
     }
 }
 
