@@ -141,6 +141,9 @@ int main (int argc, const char * argv[]) {
 }
 
 
+
+// Input: socketfd, containing the file descriptor for the socket
+// Output: sends HTTP response into socket
 void generateResponse(int socketfd) {
     
     // variable declarations
@@ -222,7 +225,6 @@ void generateResponse(int socketfd) {
 
 // Input: socketfd, containing the file descriptor for the socket
 // Output: C string, containing socket contents
-// Assumptions:
 char* writeSocketContentsToBuf(const int socketfd) {
     // allocate memory for buffer
     char * buffer = (char*)malloc(BUFSIZE);
